@@ -13,25 +13,28 @@ type HandlerFunc func(*Context)
 
 type Context struct {
 	ctx        context.Context
-	index      int
+	index      int8
 	aborted    bool
 	err        error
 	handlers   []HandlerFunc
 	Deliveries []*amqp091.Delivery
 }
 
-func NewContext(ctx context.Context, handlers []HandlerFunc) *Context {
+func NewContext(ctx context.Context, deliveries []*amqp091.Delivery, handlers []HandlerFunc) *Context {
 	return &Context{
-		ctx:      ctx,
-		index:    -1,
-		handlers: handlers,
+		ctx:        ctx,
+		index:      -1,
+		Deliveries: deliveries,
+		handlers:   handlers,
 	}
 }
 
 func (c *Context) Next() {
 	c.index++
-
-	for c.index < len(c.handlers) && !c.aborted {
+	for c.index < int8(len(c.handlers)) {
+		if c.aborted {
+			return
+		}
 		c.handlers[c.index](c)
 		c.index++
 	}
@@ -40,6 +43,14 @@ func (c *Context) Next() {
 func (c *Context) Abort(err error) {
 	c.aborted = true
 	c.err = err
+}
+
+func (c *Context) IsAborted() bool {
+	return c.aborted
+}
+
+func (c *Context) GetError() error {
+	return c.err
 }
 
 func (c *Context) Deadline() (time.Time, bool) {
@@ -59,8 +70,4 @@ func (c *Context) Err() error {
 
 func (c *Context) Value(key any) any {
 	return c.ctx.Value(key)
-}
-
-func (c *Context) SetMessage(deliveries []*amqp091.Delivery) {
-	c.Deliveries = deliveries
 }
