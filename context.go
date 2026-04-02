@@ -12,20 +12,20 @@ var _ context.Context = (*Context)(nil)
 type HandlerFunc func(*Context)
 
 type Context struct {
-	ctx        context.Context
-	index      int8
-	aborted    bool
-	err        error
-	handlers   []HandlerFunc
-	Deliveries []*amqp091.Delivery
+	ctx      context.Context
+	index    int8
+	aborted  bool
+	err      error
+	handlers []HandlerFunc
+	Delivery *amqp091.Delivery
 }
 
-func NewContext(ctx context.Context, deliveries []*amqp091.Delivery, handlers []HandlerFunc) *Context {
+func NewContext(ctx context.Context, delivery *amqp091.Delivery, handlers []HandlerFunc) *Context {
 	return &Context{
-		ctx:        ctx,
-		index:      -1,
-		Deliveries: deliveries,
-		handlers:   handlers,
+		ctx:      ctx,
+		index:    -1,
+		Delivery: delivery,
+		handlers: handlers,
 	}
 }
 
@@ -71,3 +71,4 @@ func (c *Context) Err() error {
 func (c *Context) Value(key any) any {
 	return c.ctx.Value(key)
 }
+

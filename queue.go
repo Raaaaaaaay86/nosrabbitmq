@@ -7,16 +7,34 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type Identifier int
+type Identifier int64
 
 type Queue interface {
-	Start(context.Context)
+	Start(context.Context) error
 	Close() error
 	GetIdentifier() Identifier
 	SetIdentifier(Identifier)
+	SetSignalChan(chan<- Signal)
 }
 
-type QueueFactory func(connection *amqp091.Connection) (Queue, error)
+type SignalLevel uint8
+
+const (
+	DebugSignalLevel   SignalLevel = 1
+	InfoSignalLevel    SignalLevel = 2
+	WarnSignalLevel    SignalLevel = 3
+	ErrorSignalLevel   SignalLevel = 4
+	FailureSignalLevel SignalLevel = 5
+)
+
+type Signal struct {
+	Level      SignalLevel
+	Identifier Identifier
+	Message    string
+	Error      error
+}
+
+type QueueFactory func() (Queue, error)
 
 type MessageQueueConfig struct {
 	Exchange ExchangeConfig
@@ -25,14 +43,14 @@ type MessageQueueConfig struct {
 
 	RoutingKey   string
 	NoWait       bool
-	Args         amqp091.Table
+	Table         amqp091.Table
 	BatchSize    int
 	BatchTimeout time.Duration
 	HandlerFuncs []HandlerFunc
 }
 
 func (b MessageQueueConfig) Bind(channel *amqp091.Channel) error {
-	return channel.QueueBind(b.Queue.Name, b.RoutingKey, b.Exchange.Name, b.NoWait, b.Args)
+	return channel.QueueBind(b.Queue.Name, b.RoutingKey, b.Exchange.Name, b.NoWait, b.Table)
 }
 
 func (b MessageQueueConfig) GetBatchSize() int {

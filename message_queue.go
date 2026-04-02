@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/rabbitmq/amqp091-go"
 	"golang.org/x/xerrors"
@@ -12,6 +11,7 @@ import (
 
 type MessageQueue struct {
 	identifier Identifier
+	signalChan chan<- Signal
 	connection *amqp091.Connection
 	ch         *amqp091.Channel
 	config     MessageQueueConfig
@@ -70,47 +70,38 @@ func (m *MessageQueue) Start(ctx context.Context) error {
 func (m *MessageQueue) listen() {
 	defer m.wg.Done()
 
-	batchSize := m.config.GetBatchSize()
-	batchTimeout := m.config.GetBatchTimeout()
-
-	buffer := make([]*amqp091.Delivery, 0, m.config.GetBatchSize())
-	ticker := time.NewTicker(m.config.GetBatchTimeout())
-	defer ticker.Stop()
-
-	flush := func() {
-		if len(buffer) == 0 {
-			return
-		}
-
-		deliveries := make([]*amqp091.Delivery, len(buffer))
-		copy(deliveries, buffer)
-
-		c := NewContext(m.ctx, deliveries, m.handlers)
-		c.Next()
-
-		buffer = buffer[:0]
-		ticker.Reset(batchTimeout)
-	}
-
 	for {
 		select {
 		case <-m.ctx.Done():
-			flush()
 			return
 		case d, ok := <-m.deliveries:
 			if !ok {
-				flush()
+				// Delivery channel closed unexpectedly
+				m.sendSignal(FailureSignalLevel, "delivery channel closed", nil)
 				return
 			}
 
-			dCopy := d
-			buffer = append(buffer, &dCopy)
+			m.processDelivery(&d)
+		}
+	}
+}
 
-			if len(buffer) >= batchSize {
-				flush()
-			}
-		case <-ticker.C:
-			flush()
+func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
+	c := NewContext(m.ctx, d, m.handlers)
+	c.Next()
+
+	if !m.config.Consumer.AutoAck && c.GetError() == nil {
+		_ = d.Ack(false)
+	}
+}
+
+func (m *MessageQueue) sendSignal(level SignalLevel, message string, err error) {
+	if m.signalChan != nil {
+		m.signalChan <- Signal{
+			Level:      level,
+			Identifier: m.identifier,
+			Message:    message,
+			Error:      err,
 		}
 	}
 }
@@ -139,4 +130,8 @@ func (m *MessageQueue) GetIdentifier() Identifier {
 
 func (m *MessageQueue) SetIdentifier(identifier Identifier) {
 	m.identifier = identifier
+}
+
+func (m *MessageQueue) SetSignalChan(ch chan<- Signal) {
+	m.signalChan = ch
 }
