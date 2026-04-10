@@ -7,6 +7,10 @@ import (
 	"golang.org/x/xerrors"
 )
 
+type Publisher interface {
+	Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error
+}
+
 type publishRequest struct {
 	ctx        context.Context
 	exchange   string
@@ -33,7 +37,7 @@ func (p *Producer) Start(ctx context.Context) {
 	go p.loop(ctx)
 }
 
-func (p *Producer) Publish(ctx context.Context, exchange, routingKey string, msg amqp091.Publishing) error {
+func (p *Producer) Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error {
 	if p.ctx == nil {
 		return xerrors.New("producer is not started")
 	}
