@@ -12,7 +12,7 @@ import (
 type MessageQueue struct {
 	identifier Identifier
 	signalChan chan<- Signal
-	connection *amqp091.Connection
+	connection *Connection
 	ch         *amqp091.Channel
 	config     MessageQueueConfig
 	handlers   []HandlerFunc
@@ -24,7 +24,7 @@ type MessageQueue struct {
 	wg         sync.WaitGroup
 }
 
-func NewMessageQueue(connection *amqp091.Connection, config MessageQueueConfig, handlers ...HandlerFunc) *MessageQueue {
+func NewMessageQueue(connection *Connection, config MessageQueueConfig, handlers ...HandlerFunc) *MessageQueue {
 	return &MessageQueue{
 		config:     config,
 		connection: connection,

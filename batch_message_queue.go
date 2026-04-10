@@ -13,7 +13,7 @@ type BatchMessageQueue struct {
 	batchHandlers []BatchHandlerFunc
 }
 
-func NewBatchMessageQueue(connection *amqp091.Connection, config MessageQueueConfig, handlers ...BatchHandlerFunc) *BatchMessageQueue {
+func NewBatchMessageQueue(connection *Connection, config MessageQueueConfig, handlers ...BatchHandlerFunc) *BatchMessageQueue {
 	return &BatchMessageQueue{
 		MessageQueue: MessageQueue{
 			connection: connection,
