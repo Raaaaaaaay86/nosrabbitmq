@@ -43,7 +43,7 @@ type MessageQueueConfig struct {
 
 	RoutingKey   string
 	NoWait       bool
-	Table         amqp091.Table
+	Table        amqp091.Table
 	BatchSize    int
 	BatchTimeout time.Duration
 	HandlerFuncs []HandlerFunc

@@ -13,8 +13,8 @@ import (
 )
 
 type queueState struct {
-	factory  QueueFactory
-	queue    Queue
+	factory QueueFactory
+	queue   Queue
 }
 
 type Manager struct {

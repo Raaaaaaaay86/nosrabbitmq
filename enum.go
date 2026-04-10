@@ -24,4 +24,3 @@ func (e ExchangeType) IsValid() bool {
 		return false
 	}
 }
-
