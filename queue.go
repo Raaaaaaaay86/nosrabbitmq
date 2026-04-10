@@ -46,7 +46,6 @@ type MessageQueueConfig struct {
 	Table        amqp091.Table
 	BatchSize    int
 	BatchTimeout time.Duration
-	HandlerFuncs []HandlerFunc
 }
 
 func (b MessageQueueConfig) Bind(channel *amqp091.Channel) error {
