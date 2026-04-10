@@ -2,6 +2,7 @@ package nosrabbitmq
 
 import (
 	"context"
+	"time"
 
 	"github.com/rabbitmq/amqp091-go"
 	"golang.org/x/xerrors"
@@ -40,6 +41,10 @@ func (p *Producer) Start(ctx context.Context) {
 func (p *Producer) Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error {
 	if p.ctx == nil {
 		return xerrors.New("producer is not started")
+	}
+
+	if msg.Timestamp.IsZero() {
+		msg.Timestamp = time.Now()
 	}
 
 	req := publishRequest{
