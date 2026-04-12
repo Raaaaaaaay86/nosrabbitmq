@@ -95,6 +95,7 @@ func (p *Producer) loop(ctx context.Context) {
 			return
 		case req := <-p.requests:
 			if req.ctx.Err() != nil {
+				req.errCh <- nil
 				continue
 			}
 
