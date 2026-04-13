@@ -10,6 +10,7 @@ import (
 
 type Publisher interface {
 	Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error
+	Start(ctx context.Context)
 }
 
 type publishRequest struct {
