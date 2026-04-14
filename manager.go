@@ -77,14 +77,14 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	m.ctx, m.cancel = context.WithCancel(ctx)
 
-	g, startCtx := errgroup.WithContext(m.ctx)
+	g, _ := errgroup.WithContext(m.ctx)
 
 	m.mu.RLock()
 	for _, state := range m.queues {
 		s := state // capture for closure
 		g.Go(func() error {
 			s.queue.SetSignalChan(m.signalChan)
-			return s.queue.Start(startCtx)
+			return s.queue.Start(m.ctx)
 		})
 	}
 	m.mu.RUnlock()
