@@ -2,6 +2,7 @@ package nosrabbitmq
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 
@@ -68,6 +69,13 @@ func (m *MessageQueue) Start(ctx context.Context) error {
 }
 
 func (m *MessageQueue) listen() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("message queue listening panic", "identifier", m.identifier, "recover", r)
+		} else {
+			slog.Info("message queue listening exited", "identifier", m.identifier)
+		}
+	}()
 	defer m.wg.Done()
 
 	for {

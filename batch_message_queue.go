@@ -2,6 +2,7 @@ package nosrabbitmq
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
@@ -59,6 +60,13 @@ func (m *BatchMessageQueue) Start(ctx context.Context) error {
 }
 
 func (m *BatchMessageQueue) listenBatch() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("batch message queue listening panic", "identifier", m.identifier, "recover", r)
+		} else {
+			slog.Info("batch message queue listening exited", "identifier", m.identifier)
+		}
+	}()
 	defer m.wg.Done()
 
 	batchSize := m.config.GetBatchSize()
