@@ -127,7 +127,7 @@ func (m *BatchMessageQueue) processBatch(deliveries []*amqp091.Delivery) {
 		ctx = tctx
 	}
 
-	c := NewBatchContext(context.Background(), deliveries, m.batchHandlers)
+	c := NewBatchContext(ctx, deliveries, m.batchHandlers)
 	c.Next()
 
 	if !m.config.Consumer.AutoAck && c.GetError() == nil {
