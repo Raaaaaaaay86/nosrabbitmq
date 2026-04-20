@@ -99,7 +99,14 @@ func (m *MessageQueue) listen() {
 }
 
 func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
-	ctx := m.newNativeContext(context.Background(), false)
+	ctx := context.Background()
+
+	if m.tracerProvider != nil {
+		tctx, span := m.withTracedContext(ctx)
+		defer span.End()
+
+		ctx = tctx
+	}
 
 	c := NewContext(ctx, d, m.handlers)
 	c.Next()
@@ -109,13 +116,8 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 	}
 }
 
-func (m *MessageQueue) newNativeContext(ctx context.Context, isBatchMode bool) context.Context {
-	if m.tracerProvider == nil {
-		return ctx
-	}
-
+func (m *MessageQueue) withTracedContext(ctx context.Context) (context.Context, trace.Span) {
 	tctx, span := m.tracerProvider.Tracer("").Start(ctx, fmt.Sprintf("rabbit_mq.%s", m.config.Consumer.Name))
-	defer span.End()
 
 	attrs := []attribute.KeyValue{
 		attribute.String("routing_key", m.config.RoutingKey),
@@ -137,15 +139,13 @@ func (m *MessageQueue) newNativeContext(ctx context.Context, isBatchMode bool) c
 		attribute.Bool("consumer.auto_ack", m.config.Consumer.AutoAck),
 		attribute.Bool("consumer.exclusive", m.config.Consumer.Exclusive),
 		attribute.Bool("consumer.no_wait", m.config.Consumer.NoWait),
-	}
 
-	if isBatchMode {
-		attrs = append(attrs, attribute.Bool("application.consumer.batch", isBatchMode))
+		attribute.String("app.consume_mode", "single"),
 	}
 
 	span.SetAttributes(attrs...)
 
-	return tctx
+	return tctx, span
 }
 
 func (m *MessageQueue) sendSignal(level SignalLevel, message string, err error) {
