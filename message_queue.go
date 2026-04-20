@@ -9,6 +9,7 @@ import (
 
 	"github.com/rabbitmq/amqp091-go"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/xerrors"
 )
@@ -102,7 +103,7 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 	ctx := context.Background()
 
 	if m.tracerProvider != nil {
-		tctx, span := m.withTracedContext(ctx)
+		tctx, span := m.withTracedContext(ctx, d)
 		defer span.End()
 
 		ctx = tctx
@@ -116,10 +117,15 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 	}
 }
 
-func (m *MessageQueue) withTracedContext(ctx context.Context) (context.Context, trace.Span) {
+func (m *MessageQueue) withTracedContext(ctx context.Context, d *amqp091.Delivery) (context.Context, trace.Span) {
 	tctx, span := m.tracerProvider.Tracer("").Start(ctx, fmt.Sprintf("rabbit_mq.%s", m.config.Consumer.Name))
 
 	attrs := []attribute.KeyValue{
+		semconv.MessagingSystemRabbitMQ,
+		semconv.MessagingRabbitMQDestinationRoutingKey(m.config.RoutingKey),
+		semconv.MessagingRabbitMQMessageDeliveryTag(int(d.DeliveryTag)),
+		attribute.Int("messaging.message.body.size", len(d.Body)),
+
 		attribute.String("routing_key", m.config.RoutingKey),
 
 		attribute.String("exchange.name", m.config.Exchange.Name),
