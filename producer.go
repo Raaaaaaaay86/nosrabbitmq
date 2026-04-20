@@ -107,7 +107,7 @@ func (m Producer) withTracedContext(ctx context.Context, exchange string, routin
 
 func (m Producer) getTraceName(exchange string, routingKey string) string {
 	sb := strings.Builder{}
-	sb.WriteString("rabbitmq")
+	sb.WriteString("rabbitmq.publish")
 
 	if exchange != "" {
 		sb.WriteString(fmt.Sprintf(".%s", exchange))
@@ -116,7 +116,7 @@ func (m Producer) getTraceName(exchange string, routingKey string) string {
 		sb.WriteString(fmt.Sprintf(".%s", routingKey))
 	}
 
-	return ""
+	return sb.String()
 }
 
 func (p *Producer) loop(ctx context.Context) {
