@@ -23,14 +23,21 @@ type publishRequest struct {
 
 type Producer struct {
 	connection *Connection
+	options    ProducerOptions
 	requests   chan publishRequest
 	ctx        context.Context
 }
 
-func NewProducer(connection *Connection, bufferSize int) *Producer {
+func NewProducer(connection *Connection, opts ...ProducerOption) *Producer {
+	var options ProducerOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	return &Producer{
 		connection: connection,
-		requests:   make(chan publishRequest, bufferSize),
+		options:    options,
+		requests:   make(chan publishRequest, options.bufferSize),
 	}
 }
 
