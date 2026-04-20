@@ -2,9 +2,14 @@ package nosrabbitmq
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/xerrors"
 )
 
@@ -19,6 +24,7 @@ type publishRequest struct {
 	routingKey string
 	msg        amqp091.Publishing
 	errCh      chan error
+	span       trace.Span
 }
 
 type Producer struct {
@@ -47,6 +53,8 @@ func (p *Producer) Start(ctx context.Context) {
 }
 
 func (p *Producer) Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error {
+	tctx, span := p.withTracedContext(ctx, exchange, routingKey, msg)
+
 	if p.ctx == nil {
 		return xerrors.New("producer is not started")
 	}
@@ -56,11 +64,12 @@ func (p *Producer) Publish(ctx context.Context, exchange string, routingKey stri
 	}
 
 	req := publishRequest{
-		ctx:        ctx,
+		ctx:        tctx,
 		exchange:   exchange,
 		routingKey: routingKey,
 		msg:        msg,
 		errCh:      make(chan error, 1),
+		span:       span,
 	}
 
 	select {
@@ -77,6 +86,37 @@ func (p *Producer) Publish(ctx context.Context, exchange string, routingKey stri
 	case err := <-req.errCh:
 		return err
 	}
+}
+
+func (m Producer) withTracedContext(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) (context.Context, trace.Span) {
+	tctx, span := m.options.tracerProvider.Tracer(TRACE_NAME).Start(ctx, m.getTraceName(exchange, routingKey))
+
+	attrs := []attribute.KeyValue{
+		semconv.MessagingSystemRabbitMQ,
+		semconv.MessagingRabbitMQDestinationRoutingKey(routingKey),
+		attribute.String("messaging.operation.type", "send"),
+		attribute.Int("messaging.message.body.size", len(msg.Body)),
+
+		attribute.String("exchange.name", exchange),
+	}
+
+	span.SetAttributes(attrs...)
+
+	return tctx, span
+}
+
+func (m Producer) getTraceName(exchange string, routingKey string) string {
+	sb := strings.Builder{}
+	sb.WriteString("rabbitmq")
+
+	if exchange != "" {
+		sb.WriteString(fmt.Sprintf(".%s", exchange))
+	}
+	if routingKey != "" {
+		sb.WriteString(fmt.Sprintf(".%s", routingKey))
+	}
+
+	return ""
 }
 
 func (p *Producer) loop(ctx context.Context) {
@@ -104,11 +144,13 @@ func (p *Producer) loop(ctx context.Context) {
 		case req := <-p.requests:
 			if req.ctx.Err() != nil {
 				req.errCh <- nil
+				req.span.End()
 				continue
 			}
 
 			if err := ensureChannel(); err != nil {
 				req.errCh <- err
+				req.span.End()
 				continue
 			}
 			err := ch.PublishWithContext(req.ctx, req.exchange, req.routingKey, false, false, req.msg)
@@ -117,6 +159,7 @@ func (p *Producer) loop(ctx context.Context) {
 			}
 
 			req.errCh <- err
+			req.span.End()
 		}
 	}
 }
