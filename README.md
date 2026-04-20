@@ -235,4 +235,4 @@ func (c *ChatroomConsumer) ConsumeMessage(ctx *nosrabbitmq.Context) {
 | `DIRECT`  | `"direct"` |
 | `FANOUT`  | `"fanout"` |
 | `TOPIC`   | `"topic"`  |
-| `HEADERS` | `"headers"`|
+| `HEADERS` | `"headers"`| 
