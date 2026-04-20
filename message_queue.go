@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -102,11 +103,13 @@ func (m *MessageQueue) listen() {
 func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 	ctx := context.Background()
 
+	var span trace.Span
 	if m.tracerProvider != nil {
-		tctx, span := m.withTracedContext(ctx, d)
-		defer span.End()
+		tctx, s := m.withTracedContext(ctx, d)
+		defer s.End()
 
 		ctx = tctx
+		span = s
 	}
 
 	c := NewContext(ctx, d, m.handlers)
@@ -114,6 +117,10 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 
 	if !m.config.Consumer.AutoAck && c.GetError() == nil {
 		_ = d.Ack(false)
+
+		if span != nil {
+			span.SetAttributes(attribute.String("messaging.operation.name", "ack"))
+		}
 	}
 }
 
@@ -124,6 +131,8 @@ func (m *MessageQueue) withTracedContext(ctx context.Context, d *amqp091.Deliver
 		semconv.MessagingSystemRabbitMQ,
 		semconv.MessagingRabbitMQDestinationRoutingKey(m.config.RoutingKey),
 		semconv.MessagingRabbitMQMessageDeliveryTag(int(d.DeliveryTag)),
+		attribute.String("messaging.destination.name", m.getTraceDetinationName()),
+		attribute.String("messaging.operation.type", "receive"),
 		attribute.Int("messaging.message.body.size", len(d.Body)),
 
 		attribute.String("routing_key", m.config.RoutingKey),
@@ -152,6 +161,27 @@ func (m *MessageQueue) withTracedContext(ctx context.Context, d *amqp091.Deliver
 	span.SetAttributes(attrs...)
 
 	return tctx, span
+}
+
+func (m *MessageQueue) getTraceDetinationName() string {
+	ex := m.config.Exchange.Name
+	rk := m.config.RoutingKey
+	q := m.config.Queue.Name
+
+	parts := []string{}
+	if ex != "" {
+		parts = append(parts, ex)
+	}
+
+	if rk != "" {
+		parts = append(parts, rk)
+	}
+
+	if q != "" && q != rk {
+		parts = append(parts, q)
+	}
+
+	return strings.Join(parts, ":") + " receive"
 }
 
 func (m *MessageQueue) sendSignal(level SignalLevel, message string, err error) {

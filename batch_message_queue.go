@@ -144,6 +144,8 @@ func (m *BatchMessageQueue) withTracedContext(ctx context.Context) (context.Cont
 	attrs := []attribute.KeyValue{
 		semconv.MessagingSystemRabbitMQ,
 		semconv.MessagingRabbitMQDestinationRoutingKey(m.config.RoutingKey),
+		attribute.String("messaging.destination.name", m.getTraceDetinationName()),
+		attribute.String("messaging.operation.type", "receive"),
 
 		attribute.String("routing_key", m.config.RoutingKey),
 
