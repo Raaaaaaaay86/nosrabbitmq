@@ -115,7 +115,9 @@ func (m *BatchMessageQueue) listenBatch() {
 }
 
 func (m *BatchMessageQueue) processBatch(deliveries []*amqp091.Delivery) {
-	c := NewBatchContext(m.ctx, deliveries, m.batchHandlers)
+	ctx := m.newNativeContext(context.Background(), true)
+
+	c := NewBatchContext(ctx, deliveries, m.batchHandlers)
 	c.Next()
 
 	if !m.config.Consumer.AutoAck && c.GetError() == nil {
@@ -124,3 +126,4 @@ func (m *BatchMessageQueue) processBatch(deliveries []*amqp091.Delivery) {
 		}
 	}
 }
+
