@@ -23,6 +23,7 @@ type Manager struct {
 
 	// ExternalSignalChan is used to forward non-failure signals (logs) to the caller.
 	ExternalSignalChan chan Signal
+	options            ManagerOptions
 
 	nextID    atomic.Int64
 	isStarted atomic.Bool
@@ -32,12 +33,20 @@ type Manager struct {
 	cancel    context.CancelFunc
 }
 
-func NewManager() *Manager {
-	return &Manager{
+func NewManager(opts ...ManagerOption) (*Manager, error) {
+	var options ManagerOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	manager := &Manager{
+		options:            options,
 		queues:             make(map[Identifier]*queueState),
 		signalChan:         make(chan Signal, 100),
 		ExternalSignalChan: make(chan Signal, 100),
 	}
+
+	return manager, nil
 }
 
 // Add adds a Queue factory to the manager. If the queue's Identifier is 0,
@@ -52,6 +61,10 @@ func (m *Manager) Add(factory QueueFactory) (Identifier, error) {
 	if id == 0 {
 		id = Identifier(m.nextID.Add(1))
 		queue.SetIdentifier(id)
+	}
+
+	if m.options.tracerProvider != nil {
+		queue.SetTracerProvider(m.options.tracerProvider)
 	}
 
 	m.mu.Lock()

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Identifier int64
@@ -15,6 +16,7 @@ type Queue interface {
 	GetIdentifier() Identifier
 	SetIdentifier(Identifier)
 	SetSignalChan(chan<- Signal)
+	SetTracerProvider(tracerProvider trace.TracerProvider)
 }
 
 type SignalLevel uint8
