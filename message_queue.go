@@ -4,25 +4,24 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/rabbitmq/amqp091-go"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/xerrors"
 )
 
 type MessageQueue struct {
-	identifier     Identifier
-	signalChan     chan<- Signal
-	connection     *Connection
-	ch             *amqp091.Channel
-	config         MessageQueueConfig
-	handlers       []HandlerFunc
-	tracerProvider trace.TracerProvider
+	identifier           Identifier
+	signalChan           chan<- Signal
+	connection           *Connection
+	ch                   *amqp091.Channel
+	config               MessageQueueConfig
+	handlers             []HandlerFunc
+	tracerProvider       trace.TracerProvider
+	basicTraceAttributes []attribute.KeyValue
 
 	deliveries <-chan amqp091.Delivery
 	ctx        context.Context
@@ -127,61 +126,13 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 func (m *MessageQueue) withTracedContext(ctx context.Context, d *amqp091.Delivery) (context.Context, trace.Span) {
 	tctx, span := m.tracerProvider.Tracer(TRACE_NAME).Start(ctx, fmt.Sprintf("rabbit_mq.%s", m.config.Consumer.Name))
 
-	attrs := []attribute.KeyValue{
-		semconv.MessagingSystemRabbitMQ,
-		semconv.MessagingRabbitMQDestinationRoutingKey(m.config.RoutingKey),
-		semconv.MessagingRabbitMQMessageDeliveryTag(int(d.DeliveryTag)),
-		attribute.String("messaging.destination.name", m.getTraceDetinationName()),
-		attribute.String("messaging.operation.type", "receive"),
-		attribute.Int("messaging.message.body.size", len(d.Body)),
-
-		attribute.String("routing_key", m.config.RoutingKey),
-
-		attribute.String("exchange.name", m.config.Exchange.Name),
-		attribute.String("exchange.type", string(m.config.Exchange.Type)),
-		attribute.Bool("exchange.durable", m.config.Exchange.Durable),
-		attribute.Bool("exchange.auto_delete", m.config.Exchange.AutoDelete),
-		attribute.Bool("exchange.internal", m.config.Exchange.Internal),
-		attribute.Bool("exchange.no_wait", m.config.Exchange.NoWait),
-
-		attribute.String("queue.name", m.config.Queue.Name),
-		attribute.Bool("queue.durable", m.config.Queue.Durable),
-		attribute.Bool("queue.auto_delete", m.config.Queue.AutoDelete),
-		attribute.Bool("queue.exclusive", m.config.Queue.Exclusive),
-		attribute.Bool("queue.no_wait", m.config.Queue.NoWait),
-
-		attribute.String("consumer.name", m.config.Consumer.Name),
-		attribute.Bool("consumer.auto_ack", m.config.Consumer.AutoAck),
-		attribute.Bool("consumer.exclusive", m.config.Consumer.Exclusive),
-		attribute.Bool("consumer.no_wait", m.config.Consumer.NoWait),
-
-		attribute.String("app.consume_mode", "single"),
+	delivery := otelDelivery{
+		delivery: d,
 	}
 
-	span.SetAttributes(attrs...)
+	span.SetAttributes(delivery.GetSingleConsumeAttributes(m.config.Queue.Name)...)
 
 	return tctx, span
-}
-
-func (m *MessageQueue) getTraceDetinationName() string {
-	ex := m.config.Exchange.Name
-	rk := m.config.RoutingKey
-	q := m.config.Queue.Name
-
-	parts := []string{}
-	if ex != "" {
-		parts = append(parts, ex)
-	}
-
-	if rk != "" {
-		parts = append(parts, rk)
-	}
-
-	if q != "" && q != rk {
-		parts = append(parts, q)
-	}
-
-	return strings.Join(parts, ":") + " receive"
 }
 
 func (m *MessageQueue) sendSignal(level SignalLevel, message string, err error) {
