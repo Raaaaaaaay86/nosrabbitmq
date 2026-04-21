@@ -8,69 +8,60 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 )
 
-type otelDelivery struct {
-	delivery *amqp091.Delivery
-}
-
-func (o otelDelivery) GetSingleConsumeAttributes(queueName string) []attribute.KeyValue {
-	attrs := o.GetBasicAttributes(queueName)
+func getSingleConsumeAttributes(queueName string, delivery *amqp091.Delivery) []attribute.KeyValue {
+	attrs := getBasicAttributes(queueName)
 
 	attrs = append(attrs,
+		semconv.MessagingRabbitMQDestinationRoutingKey(delivery.RoutingKey),
+		semconv.MessagingRabbitMQMessageDeliveryTag(int(delivery.DeliveryTag)),
+		attribute.String("messaging.destination.name", getDetinationName(queueName, delivery)),
 		attribute.String("app.consume_mode", "single"),
-		attribute.Int("messaging.message.body.size", len(o.delivery.Body)),
+		attribute.Int("messaging.message.body.size", len(delivery.Body)),
 	)
 
 	return attrs
 }
 
-func (o otelDelivery) GetBasicAttributes(queueName string) []attribute.KeyValue {
+func getBasicAttributes(queueName string) []attribute.KeyValue {
 	return []attribute.KeyValue{
 		semconv.MessagingSystemRabbitMQ,
-		semconv.MessagingRabbitMQDestinationRoutingKey(o.delivery.RoutingKey),
-		semconv.MessagingRabbitMQMessageDeliveryTag(int(o.delivery.DeliveryTag)),
-		attribute.String("messaging.destination.name", o.getDetinationName(queueName)),
 		attribute.String("messaging.operation.type", "receive"),
 	}
 }
 
-func (o otelDelivery) getDetinationName(queueName string) string {
+func getDetinationName(queueName string, delivery *amqp091.Delivery) string {
 	parts := []string{}
-	if o.delivery.Exchange != "" {
-		parts = append(parts, o.delivery.Exchange)
+	if delivery.Exchange != "" {
+		parts = append(parts, delivery.Exchange)
 	}
 
-	if o.delivery.RoutingKey != "" {
-		parts = append(parts, o.delivery.RoutingKey)
+	if delivery.RoutingKey != "" {
+		parts = append(parts, delivery.RoutingKey)
 	}
 
-	if queueName != "" && queueName != o.delivery.RoutingKey {
+	if queueName != "" && queueName != delivery.RoutingKey {
 		parts = append(parts, queueName)
 	}
 
-	return strings.Join(parts, ":") + " receive"
+	return strings.Join(parts, ":")
 }
 
-type otelDeliveries struct {
-	deliveries []*amqp091.Delivery
-}
-
-func (o otelDeliveries) GetBatchConsumeAttributes(queueName string) []attribute.KeyValue {
-	var delivery otelDelivery
-
-	attrs := delivery.GetBasicAttributes(queueName)
+func getBatchConsumeAttributes(queueName string, deliveries []*amqp091.Delivery) []attribute.KeyValue {
+	attrs := getBasicAttributes(queueName)
 
 	attrs = append(attrs,
 		attribute.String("app.consume_mode", "batch"),
-		attribute.Int("messaging.message.body.size", o.GetBatchSize()),
+		attribute.Int("messaging.batch.message_count", len(deliveries)),
+		attribute.Int("messaging.batch.body.size", getBatchSize(deliveries)),
 	)
 
 	return attrs
 }
 
-func (o otelDeliveries) GetBatchSize() int {
+func getBatchSize(deliveries []*amqp091.Delivery) int {
 	total := 0
 
-	for _, delivery := range o.deliveries {
+	for _, delivery := range deliveries {
 		total += len(delivery.Body)
 	}
 

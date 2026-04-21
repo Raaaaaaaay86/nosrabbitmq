@@ -136,14 +136,10 @@ func (m *BatchMessageQueue) processBatch(deliveries []*amqp091.Delivery) {
 	}
 }
 
-func (m *BatchMessageQueue) withTracedContext(ctx context.Context, ds []*amqp091.Delivery) (context.Context, trace.Span) {
+func (m *BatchMessageQueue) withTracedContext(ctx context.Context, deliveries []*amqp091.Delivery) (context.Context, trace.Span) {
 	tctx, span := m.tracerProvider.Tracer(TRACER_NAME).Start(ctx, fmt.Sprintf("rabbit_mq.batch.%s", m.config.Consumer.Name))
 
-	deliveries := otelDeliveries{
-		deliveries: ds,
-	}
-
-	span.SetAttributes(deliveries.GetBatchConsumeAttributes(m.config.Queue.Name)...)
+	span.SetAttributes(getBatchConsumeAttributes(m.config.Queue.Name, deliveries)...)
 
 	return tctx, span
 }
