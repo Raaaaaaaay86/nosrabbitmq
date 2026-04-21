@@ -24,7 +24,7 @@ type publishRequest struct {
 	routingKey string
 	msg        amqp091.Publishing
 	errCh      chan error
-	span       trace.Span
+	endSpan       func()
 }
 
 type Producer struct {
@@ -53,8 +53,6 @@ func (p *Producer) Start(ctx context.Context) {
 }
 
 func (p *Producer) Publish(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) error {
-	tctx, span := p.withTracedContext(ctx, exchange, routingKey, msg)
-
 	if p.ctx == nil {
 		return xerrors.New("producer is not started")
 	}
@@ -64,12 +62,20 @@ func (p *Producer) Publish(ctx context.Context, exchange string, routingKey stri
 	}
 
 	req := publishRequest{
-		ctx:        tctx,
+		ctx:        ctx,
 		exchange:   exchange,
 		routingKey: routingKey,
 		msg:        msg,
 		errCh:      make(chan error, 1),
-		span:       span,
+		endSpan:       func() {},
+	}
+
+	if p.options.tracerProvider != nil {
+		tctx, span := p.withTracedContext(ctx, exchange, routingKey, msg)
+		req.ctx = tctx
+		req.endSpan = func() {
+			span.End()
+		}
 	}
 
 	select {
@@ -144,13 +150,13 @@ func (p *Producer) loop(ctx context.Context) {
 		case req := <-p.requests:
 			if req.ctx.Err() != nil {
 				req.errCh <- nil
-				req.span.End()
+				req.endSpan()
 				continue
 			}
 
 			if err := ensureChannel(); err != nil {
 				req.errCh <- err
-				req.span.End()
+				req.endSpan()
 				continue
 			}
 			err := ch.PublishWithContext(req.ctx, req.exchange, req.routingKey, false, false, req.msg)
@@ -159,7 +165,7 @@ func (p *Producer) loop(ctx context.Context) {
 			}
 
 			req.errCh <- err
-			req.span.End()
+			req.endSpan()
 		}
 	}
 }
