@@ -124,7 +124,7 @@ func (m *MessageQueue) processDelivery(d *amqp091.Delivery) {
 }
 
 func (m *MessageQueue) withTracedContext(ctx context.Context, d *amqp091.Delivery) (context.Context, trace.Span) {
-	tctx, span := m.tracerProvider.Tracer(TRACE_NAME).Start(ctx, fmt.Sprintf("rabbit_mq.%s", m.config.Consumer.Name))
+	tctx, span := m.tracerProvider.Tracer(TRACER_NAME).Start(ctx, fmt.Sprintf("rabbit_mq.%s", m.config.Consumer.Name))
 
 	delivery := otelDelivery{
 		delivery: d,

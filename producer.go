@@ -89,7 +89,7 @@ func (p *Producer) Publish(ctx context.Context, exchange string, routingKey stri
 }
 
 func (m Producer) withTracedContext(ctx context.Context, exchange string, routingKey string, msg amqp091.Publishing) (context.Context, trace.Span) {
-	tctx, span := m.options.tracerProvider.Tracer(TRACE_NAME).Start(ctx, m.getTraceName(exchange, routingKey))
+	tctx, span := m.options.tracerProvider.Tracer(TRACER_NAME).Start(ctx, m.getTraceName(exchange, routingKey))
 
 	attrs := []attribute.KeyValue{
 		semconv.MessagingSystemRabbitMQ,
