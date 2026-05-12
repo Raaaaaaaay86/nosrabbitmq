@@ -1,8 +1,14 @@
-# nosrabbitmq
+<h1 align="center"> nosrabbitmq </h1>
 
-`nosrabbitmq` is a RabbitMQ client library for the nos ecosystem. It provides a `Manager` that owns the lifecycle of multiple message queues, automatic self-healing on connection loss, a `Producer` for publishing messages, and a gin-style middleware chain (`Context` / `BatchContext`) for consumer handlers.
+<p>
+nosrabbitmq is a RabbitMQ client library for the nos ecosystem. It provides a Manager that owns the lifecycle of multiple message queues, automatic self-healing on connection loss, a Producer for publishing messages, and a gin-style middleware chain (Context / BatchContext) for consumer handlers.
+</p>
 
-## Installation
+<p align="center">
+  <a href="README.zh-TW.md">中文</a>
+</p>
+
+## Install
 
 ```bash
 go get github.com/raaaaaaaay86/nosrabbitmq
@@ -37,7 +43,7 @@ defer conn.Close()
 ### 2. Publish Messages
 
 ```go
-producer := nosrabbitmq.NewProducer(conn, 1024 /* buffer size */)
+producer := nosrabbitmq.NewProducer(conn, nosrabbitmq.WithBufferSize(1024))
 producer.Start(ctx)
 
 err := producer.Publish(ctx, "my.exchange", "routing.key", amqp091.Publishing{
@@ -235,4 +241,4 @@ func (c *ChatroomConsumer) ConsumeMessage(ctx *nosrabbitmq.Context) {
 | `DIRECT`  | `"direct"` |
 | `FANOUT`  | `"fanout"` |
 | `TOPIC`   | `"topic"`  |
-| `HEADERS` | `"headers"`| 
+| `HEADERS` | `"headers"`|

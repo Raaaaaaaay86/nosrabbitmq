@@ -1,6 +1,12 @@
-# nosrabbitmq
+<h1 align="center"> nosrabbitmq </h1>
 
-`nosrabbitmq` 是 nos 生態系的 RabbitMQ 客戶端套件。提供 `Manager` 統一管理多個訊息佇列的生命週期、連線斷線時自動自癒、用於發布訊息的 `Producer`，以及類似 gin 的 middleware chain（`Context` / `BatchContext`）供消費者 handler 使用。
+<p>
+nosrabbitmq 是 nos 生態系的 RabbitMQ 客戶端套件。提供 Manager 統一管理多個訊息佇列的生命週期、連線斷線時自動自癒、用於發布訊息的 Producer，以及類似 gin 的 middleware chain（Context / BatchContext）供消費者 handler 使用。
+</p>
+
+<p align="center">
+  <a href="README.md">English</a>
+</p>
 
 ## 安裝
 
@@ -37,7 +43,7 @@ defer conn.Close()
 ### 2. 發布訊息
 
 ```go
-producer := nosrabbitmq.NewProducer(conn, 1024 /* buffer size */)
+producer := nosrabbitmq.NewProducer(conn, nosrabbitmq.WithBufferSize(1024))
 producer.Start(ctx)
 
 err := producer.Publish(ctx, "my.exchange", "routing.key", amqp091.Publishing{
